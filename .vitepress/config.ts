@@ -4,6 +4,7 @@ import { DefaultTheme } from 'vitepress/types/default-theme'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "Vrite",
+  base: "/",
   description: "Vite Art",
   srcDir: "./src",
   lang: 'en-US',
