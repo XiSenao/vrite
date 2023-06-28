@@ -37,7 +37,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/XiSenao/vrite/src/:path',
+      pattern: 'https://github.com/XiSenao/vrite/tree/master/src/:path',
       text: 'Edit this page on GitHub'
     },
 
