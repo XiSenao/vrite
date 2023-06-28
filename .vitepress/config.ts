@@ -1,6 +1,14 @@
 import { defineConfig } from 'vitepress'
 import { DefaultTheme } from 'vitepress/types/default-theme'
 
+const headPrependInjectRE = /([ \t]*)<head[^>]*>/i;
+const favicon = `
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="manifest" href="/site.webmanifest">
+`
+
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "Vrite",
@@ -58,6 +66,14 @@ export default defineConfig({
     socialLinks: [
       { icon: 'github', link: 'https://github.com/XiSenao' }
     ],
+  },
+  transformHtml (html) {
+    if (headPrependInjectRE.test(html)) {
+      return html.replace(
+        headPrependInjectRE,
+        (match) => `${match}\n${favicon}`,
+      )
+    }
   }
 })
 
