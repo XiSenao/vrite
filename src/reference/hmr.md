@@ -1,6 +1,6 @@
 # 热替换
 
-热替换(Hot Module Replacement) 指的是修改代码后无需刷新页面即可生效。经常跟 `Hot Module Reload` 搞混。一个成熟的框架是必须要具备热替换能力的。Vite 的热替换实现与业界知名的一些模块如 `webpack-dev-server` 的实现类似。本质都是通过 websocket 建立服务端与浏览器的通信。如果对 `WebSocket` 不了解的可能需要先去学习下相关知识点。这里我们将分别分析修改几种不同类型的文件如 `.vue`, `.js`, `.css` 文件的热替换机制在 Vite 是具体如何实现的。同时也会分析 Vite 提供的热替换相关的 API，如: `import.meta.hot`
+热替换(Hot Module Replacement) 指的是修改代码后无需刷新页面即可生效。经常跟 `Hot Module Reload` 搞混。一个成熟的框架是必须要具备热替换能力的。Vite 的热替换实现与业界知名的一些模块如 `webpack-dev-server` 的实现类似。本质都是通过 websocket 建立服务端与浏览器的通信。如果对 `WebSocket` 不了解的可能需要先去学习下相关知识点。这里我们将分别分析修改几种不同类型的文件如 `.vue`, `.js`, `.css` 文件的热替换机制在 Vite 是具体如何实现的。同时也会分析 Vite 提供的热替换相关的 API，如: `import.meta.hot`。
 
 ## 监听文件变化
 
