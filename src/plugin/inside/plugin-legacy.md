@@ -31,6 +31,158 @@
 
 ## 实现思路
 
+从入口处可以看出 `@vitejs/plugin-legacy` 模块导出格式如下：
+
+```js
+// @vitejs/plugin-legacy
+
+function viteLegacyPlugin(options = {}) {
+
+  const legacyConfigPlugin = {
+    // ...
+  }
+
+  const legacyGenerateBundlePlugin = {
+    // ...
+  }
+
+  const legacyPostPlugin = {
+    // ...
+  }
+
+  return [legacyConfigPlugin, legacyGenerateBundlePlugin, legacyPostPlugin];
+}
+
+export { cspHashes, viteLegacyPlugin as default, detectPolyfills };
+```
+
+也就是说使用 `@vitejs/plugin-legacy` 模块本质上会导入三个插件 `legacyConfigPlugin`、`legacyGenerateBundlePlugin`、`legacyPostPlugin`。以下逐一分析每一个插件具体做了什么。
+
+### legacyConfigPlugin
+
+源码结构很简单：
+
+```js{1,8,11,26,34}
+const genLegacy = options.renderLegacyChunks !== false;
+
+const legacyConfigPlugin = {
+  name: "vite:legacy-config",
+  config(config2, env) {
+    if (env.command === "build" && !config2.build?.ssr) {
+      if (!config2.build) {
+        config2.build = {};
+      }
+      if (!config2.build.cssTarget) {
+        config2.build.cssTarget = "chrome61";
+      }
+      if (genLegacy) {
+        overriddenBuildTarget = config2.build.target !== void 0;
+        config2.build.target = [
+          "es2020",
+          "edge79",
+          "firefox67",
+          "chrome64",
+          "safari12"
+        ];
+      }
+    }
+    return {
+      define: {
+        "import.meta.env.LEGACY": env.command === "serve" || config2.build?.ssr ? false : legacyEnvVarMarker
+      }
+    };
+  },
+  configResolved(config2) {
+    if (overriddenBuildTarget) {
+      config2.logger.warn(
+        colors.yellow(
+          `plugin-legacy overrode 'build.target'. You should pass 'targets' as an option to this plugin with the list of legacy browsers to support instead.`
+        )
+      );
+    }
+  }
+};
+```
+
+插件实现逻辑比较简单，可以概括如下三点：
+
+- `css` 的兼容性版本默认为 `chrome61`。直观的示例是当你要兼容的场景是安卓微信中的 `webview` 时，它支持大多数现代的 `JavaScript` 功能，但并不支持 [CSS 中的 `#RGBA` 十六进制颜色符号](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#rgb_colors)。这种情况下，你需要将 `build.cssTarget` 设置为 `chrome61`(`chrome 61` 以下的版本不支持 `#RGBA`)，来防止 `ESbuild` 将 `rgba()` 颜色默认转化为 `#RGBA` 十六进制符号的形式，[文档参考](https://esbuild.github.io/content-types/#css)。
+- 使用插件后，`plugin-legacy` 插件会覆盖项目 `build.target` 的配置项。`["es2020", "edge79", "firefox67", "chrome64", "safari12"]`。
+- 全局注入 `import.meta.env.LEGACY` 常量，只有在构建阶段生效，`开发` 或者 `SSR阶段` 无效。
+
+### legacyPostPlugin
+
+源码结构如下，可以看出在构建的 `post` 阶段会暴露出四个钩子，`configResolved`、`renderChunk`、`transformIndexHtml`、`generateBundle`。
+
+```js{5,8,11,14}
+const legacyPostPlugin = {
+  name: "vite:legacy-post-process",
+  enforce: "post",
+  apply: "build",
+  configResolved(_config) {
+    // ...
+  },
+  async renderChunk(raw, chunk, opts) {
+    // ...
+  },
+  transformIndexHtml(html, { chunk }) {
+    // ...
+  },
+  generateBundle(opts, bundle) {
+    // ...
+  }
+}
+```
+
+#### configResolved 插件的关注点
+
+阅读以下源码
+
+```js
+function configResolved(_config) {
+  if (_config.build.lib) {
+    throw new Error("@vitejs/plugin-legacy does not support library mode.");
+  }
+  config = _config;
+  if (!genLegacy || config.build.ssr) {
+    return;
+  }
+  targets = options.targets || browserslistLoadConfig({ path: config.root }) || "last 2 versions and not dead, > 0.3%, Firefox ESR";
+  isDebug && console.log(`[@vitejs/plugin-legacy] targets:`, targets);
+  const getLegacyOutputFileName = (fileNames, defaultFileName = "[name]-legacy-[hash].js") => {
+    if (!fileNames) {
+      return path.posix.join(config.build.assetsDir, defaultFileName);
+    }
+    return (chunkInfo) => {
+      let fileName = typeof fileNames === "function" ? fileNames(chunkInfo) : fileNames;
+      if (fileName.includes("[name]")) {
+        fileName = fileName.replace("[name]", "[name]-legacy");
+      } else {
+        fileName = fileName.replace(/(.+)\.(.+)/, "$1-legacy.$2");
+      }
+      return fileName;
+    };
+  };
+  const createLegacyOutput = (options2 = {}) => {
+    return {
+      ...options2,
+      format: "system",
+      entryFileNames: getLegacyOutputFileName(options2.entryFileNames),
+      chunkFileNames: getLegacyOutputFileName(options2.chunkFileNames)
+    };
+  };
+  const { rollupOptions } = config.build;
+  const { output } = rollupOptions;
+  if (Array.isArray(output)) {
+    rollupOptions.output = [...output.map(createLegacyOutput), ...output];
+  } else {
+    rollupOptions.output = [createLegacyOutput(output), output || {}];
+  }
+}
+```
+
+可以看出通过 `rollupOptions.output` 配置项，为其添加 `legacy` 的输出格式。
+
 借助 `@babel/standalone` 的 `transfrom` 的能力
 
 ```js

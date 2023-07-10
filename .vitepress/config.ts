@@ -18,6 +18,10 @@ export default defineConfig({
   lang: 'en-US',
   lastUpdated: true,
   cleanUrls: true,
+
+  markdown: {
+    lineNumbers: true,
+  },
   
   head: [
     ['meta', { name: 'theme-color', content: '#3c8772' }],
@@ -159,6 +163,10 @@ function sidebarGuide (): DefaultTheme.SidebarItem[] {
         {
           text: "Why Does ZSH Start Slowly",
           link: "/other/why-does-zsh-start-slowly"
+        },
+        {
+          text: "Deploy Github Page Site",
+          link: "/other/deploy-github-page-site"
         }
       ]
     }
