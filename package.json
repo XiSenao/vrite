@@ -5,6 +5,8 @@
     "preview": "vitepress preview"
   },
   "dependencies": {
+    "@algolia/client-search": "^4.19.1",
+    "search-insights": "^2.7.0",
     "vitepress": "1.0.0-beta.3"
   }
 }

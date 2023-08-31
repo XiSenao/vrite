@@ -3,7 +3,7 @@
 ## 目标
 
 - 提交代码时自动部署 `github page` 站点。
-- 站点域名为自定义域名(非 `{username}.github.io` 域名)。
+- 站点域名为自定义域名(非 `{username}.github.io` 域名，`username` 为自身 github 账号名称)。
 - 采用 `cdn` 加速资源，提高用户访问速度。
 
 ## 实现
@@ -53,7 +53,7 @@
             uses: actions/deploy-pages@v1
    ```
 
-    需要注意以上 `yaml` 模块中第 `6`（`push` 代码到 `main` 分支时支持工作流）、`27`（通过 `npm run docs:build` 脚本来构建仓库）、`31`（将前面构建好的产物（产物路径： `docs/.vitepress/dist`）作为项目上传） ，根据自身项目来做适当修改。当前项目修改配置模块如下：
+    需要注意以上 `yaml` 模块中第 `6` 行（当本地代码 `push` 代码到 `main` 分支时执行 github 工作流）、第 `27` 行（github 工作流会执行 `npm run docs:build` 脚本来构建仓库）、第 `31` 行（将构建好的产物（路径： `docs/.vitepress/dist`）作为发布）。以上可以根据自身项目情况来做适当修改。当前项目修改配置模块如下：
 
     ```yaml
     name: Deploy
@@ -94,7 +94,7 @@
             uses: actions/deploy-pages@v1
     ```
 
-    设置后每当代码 `push` 到 `master` 分支后会自动执行工作流， 执行 `npm run build` 指令构建当前仓库，将路径为 `.vitepress/dist` 的构建成功的产物进行上传并自动部署到 `github page` 站点上，那么就可以通过 `{username}.github.io` 静态页面。
+    设置后每次代码 `push` 到 `master` 分支后会自动执行 github 工作流， 工作流会自动执行 `npm run build` 指令来构建当前仓库，将路径为 `.vitepress/dist` 的构建成功的产物进行上传并自动部署到 `github page` 站点上，那么就可以通过 `{username}.github.io` 静态页面。
 2. 通过分支来自动部署
 
 ### 自定义域名配置
@@ -153,6 +153,7 @@
 `cdn` 配置好之后会获取到 `cdn` 提供的 `cname` 地址
 
 ![获取vrite-cdn的cname值](/get-vrite-cdn-cname-value.png)
+3. `DNS 服务器` -> `CDN 服务器` 配置
 
 在域名的 `DNSPod` 中添加 `CNAME` 记录，其他的记录可以删掉。
 
@@ -160,8 +161,12 @@
 
 为 `vrite.cn` 和 `www.vrite.cn` 配置证书
 
-腾讯云可申请 `50` 个免费证书，提交证书申请中的域名验证方式默认为 `自动DNS验证`，但本次申请过程中发现自动在 `DNSPod` 中添加 `CNAME` 记录但一直校验失败，后通过人工客服审批过。后续申请时可以考虑其他两种校验方式 `手动DNS验证`、`文件校验`。 证书在 `24` 小时内可以审批下来，之后可以为两个域名添加证书。
+腾讯云可申请 `50` 个免费证书，提交证书申请中的域名验证方式默认为 `自动DNS验证`，但本次申请过程中发现自动在 `DNSPod` 中添加 `CNAME` 记录但一直校验失败，后通过人工客服审批过(未告知原因)。后续申请时可以考虑其他两种校验方式 `手动DNS验证`、`文件校验`。 证书在 `24` 小时内可以审批下来，之后可以为两个域名添加证书。
 
 ![为域名添加证书](/add-certificate-to-domain-name.png)
 
 配置完成后过一会儿就可以正常访问站点。
+
+::: warning 发现一个问题
+    在cdn欠费的情况下，证书也会失效，因此在缴费完成后可以点击右侧 更新 按钮来重置证书。
+:::

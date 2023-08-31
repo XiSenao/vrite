@@ -153,6 +153,10 @@ function sidebarGuide (): DefaultTheme.SidebarItem[] {
       collapsed: false,
       items: [
         {
+          text: "Package Manager",
+          link: "/other/package-manager"
+        },
+        {
           text: "TS Prompt Support",
           link: "/other/configuration-item-ts-type-prompt-in-vite"
         },

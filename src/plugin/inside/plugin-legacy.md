@@ -5,7 +5,7 @@
 
 ### Vite 的浏览器兼容性
 
-用于生产环境的构建包会假设目标浏览器支持现代 `JavaScript` 语法。默认情况下，`Vite` 的目标是能够能支持 [原生 ESM 语法的 script 标签](https://caniuse.com/es6-module)、[原生 ESM 动态导入](https://caniuse.com/es6-module-dynamic-import) 和 `import.meta` 的浏览器，包含如下：
+用于生产环境的构建包会假设目标浏览器支持现代 `JavaScript` 语法。默认情况下，`Vite` 的目标是支持包含 [原生 ESM 语法的 script 标签](https://caniuse.com/es6-module)、[原生 ESM 动态导入](https://caniuse.com/es6-module-dynamic-import) 和 `import.meta` 的浏览器，包含如下：
 
 | Browser       |     Version   |
 | ------------- | :-----------: |
@@ -14,7 +14,7 @@
 | Safari        |     >= 14     |
 | Edge          |     >= 88     |
 
-你也可以通过 [build.target](https://cn.vitejs.dev/config/build-options.html#build-target) 配置项 指定构建目标，最低支持 `es2015`。
+你也可以通过 [build.target](https://cn.vitejs.dev/config/build-options.html#build-target) 配置项 指定构建目标，最低支持 `es2015`(ES6，基本作为业界标准)。
 
 请注意，默认情况下 `Vite` 只处理语法转译，且 **默认不包含任何 polyfill**。你可以前往 [Polyfill.io](https://polyfill.io/v3/) 查看，这是一个基于用户浏览器 `User-Agent` 字符串自动生成 `polyfill` 包的服务。
 
@@ -106,9 +106,15 @@ const legacyConfigPlugin = {
 
 插件实现逻辑比较简单，可以概括如下三点：
 
-- `css` 的兼容性版本默认为 `chrome61`。直观的示例是当你要兼容的场景是安卓微信中的 `webview` 时，它支持大多数现代的 `JavaScript` 功能，但并不支持 [CSS 中的 `#RGBA` 十六进制颜色符号](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#rgb_colors)。这种情况下，你需要将 `build.cssTarget` 设置为 `chrome61`(`chrome 61` 以下的版本不支持 `#RGBA`)，来防止 `ESbuild` 将 `rgba()` 颜色默认转化为 `#RGBA` 十六进制符号的形式，[文档参考](https://esbuild.github.io/content-types/#css)。
+- `css` 的兼容性版本默认为 `chrome61`。直观的示例是当你要兼容的场景是安卓微信中的 `webview` 时，它支持大多数现代的 `JavaScript` 功能，但并不支持 [CSS 中的 `#RGBA` 十六进制颜色符号](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#rgb_colors)。这种情况下，你需要将 `build.cssTarget` 设置为 `chrome61`(`chrome 61` 以下的版本不支持 `#RGBA`)，来防止 `ESbuild` 将 `rgba()` 颜色默认转化为 `#RGBA` 十六进制符号的形式，[文档参考](https://esbuild.github.io/content-types/#css)（若用户已配置，那么则不做处理）。
+
+  以下 `Esbuild` 官方也做出了[解释和建议](https://esbuild.github.io/content-types/#css)：
+  ![Esbuild对于CSS的处理](/esbuild's-handling-of-css.png)
+
+  简单来说，默认情况下 `Esbuild` 的输出将利用所有现代 `CSS` 的特性，因此在使用 `color: rgba()` 和 `CSS 嵌套语法` 的情况下会进行语法的转换和支持。若无法满足运行载体(大多为浏览器)的需求，那么需要为 `Esbuild` 指定特定的构建目标( Vite 中为 **`build.cssTarget`** )。
+
 - 使用插件后，`plugin-legacy` 插件会覆盖项目 `build.target` 的配置项。`["es2020", "edge79", "firefox67", "chrome64", "safari12"]`。
-- 全局注入 `import.meta.env.LEGACY` 常量，只有在构建阶段生效，`开发` 或者 `SSR阶段` 无效。
+- 全局注入 `import.meta.env.LEGACY` 常量，值为 `__VITE_IS_LEGACY__`，只有在构建阶段生效，`renderChunk` 阶段会将其替换为已知的布尔值，`DEV` 和 `SSR` 阶段无效。
 
 ### legacyPostPlugin
 
@@ -134,7 +140,7 @@ const legacyPostPlugin = {
 }
 ```
 
-#### configResolved 插件的关注点
+#### configResolved 钩子的关注点
 
 阅读以下源码
 
@@ -147,6 +153,15 @@ function configResolved(_config) {
   if (!genLegacy || config.build.ssr) {
     return;
   }
+  /**
+   * browserslistLoadConfig 为获取根目录下的 package.json 中的配置项。
+   * config = module[package.json]
+   * return 
+   * config[process.env.BROWSERSLIST_ENV] ||
+   * config[process.env.NODE_ENV] ||
+   * config["production"] ||
+   * config.defaults
+   */
   targets = options.targets || browserslistLoadConfig({ path: config.root }) || "last 2 versions and not dead, > 0.3%, Firefox ESR";
   isDebug && console.log(`[@vitejs/plugin-legacy] targets:`, targets);
   const getLegacyOutputFileName = (fileNames, defaultFileName = "[name]-legacy-[hash].js") => {
@@ -163,6 +178,7 @@ function configResolved(_config) {
       return fileName;
     };
   };
+  // 确定 legacy 产物的输出形式
   const createLegacyOutput = (options2 = {}) => {
     return {
       ...options2,
@@ -181,19 +197,35 @@ function configResolved(_config) {
 }
 ```
 
-可以看出通过 `rollupOptions.output` 配置项，为其添加 `legacy` 的输出格式。
+这个插件的主要能力为通过 `rollupOptions.output` 配置项，在输出产物中额外确定并添加 `legacy` 产物的输出格式。
 
-借助 `@babel/standalone` 的 `transfrom` 的能力
+#### renderChunk 钩子的关注点
 
-```js
-const legacyPostPlugin = {
-  name: 'vite:legacy-post-process',
-  enforce: 'post',
-  apply: 'build',
-  renderChunk(raw, chunk, opts) {
-    const { code, map } = loadBabel().transform(raw, {
-      // ...
-      presets: [
+在 renderChunk 中主要分为两个部分的处理，分别是对于legacy模块和非legacy模块的处理。
+
+##### legacy模块的处理
+
+代码处理流程如下：
+
+```ts
+async renderChunk(raw, chunk, opts) {
+  // ... 略去非 legacy 部分的处理及其不相关部分。
+  opts.__vite_skip_esbuild__ = true;
+  opts.__vite_force_terser__ = true;
+  opts.__vite_skip_asset_emit__ = true;
+  const needPolyfills = options.polyfills !== false && !Array.isArray(options.polyfills);
+  const sourceMaps = !!config.build.sourcemap;
+  const babel2 = await loadBabel();
+  const result = babel2.transform(raw, {
+    babelrc: false,
+    configFile: false,
+    compact: !!config.build.minify,
+    sourceMaps,
+    inputSourceMap: void 0,
+    presets: [
+      // forcing our plugin to run before preset-env by wrapping it in a
+      // preset so we can catch the injected import statements...
+      [
         () => ({
           plugins: [
             recordAndRemovePolyfillBabelPlugin(legacyPolyfills),
@@ -201,40 +233,240 @@ const legacyPostPlugin = {
             wrapIIFEBabelPlugin()
           ]
         })
+      ],
+      [
+        (await import('@babel/preset-env')).default,
+        // 确定 @babel/preset-env 插件的配置项
+        createBabelPresetEnvOptions(targets, {
+          needPolyfills,
+          ignoreBrowserslistConfig: options.ignoreBrowserslistConfig
+        })
       ]
+    ]
+  });
+}
+```
+
+::: tip
+值得注意的是引入当前插件会在原先 `bundle` 的基础上备份出 `legacy-bundle`。以下参数仅针对于 `legacy-bundle` 有效，`normol-bundle` 参数值均为 `undefined`。
+1. `__vite_skip_esbuild__`： 配置为 `true` 可以跳过 `vite:esbuild-transpile` 插件（该插件的功能为压缩模块或将`TypeScript` 转译为 `js` 模块）的 `renderChunk` 阶段。避免在 `legacy` 模块上使用 `esbuild` 转换，因为它会生成 `legacy-unsafe` 代码 - 例如将对象属性重写为简写。
+把 `a={name}` 转成 `a={name:name}` 最终还会生成 `a={name}`。会导致 `swc\babel\typescript` 之类的插件无法正常使用。
+2. `__vite_force_terser__`： 对于 `legacy` 模块，强制使用 `terser` 来进行压缩。只有在不禁用最小化且非压缩 `ES lib` 的情况下才会生效，因为这将完全排除 `terser` 插件。
+3. `__vite_skip_asset_emit__`：在 `generateBundle` 钩子中，`Vite` 会删除来自 `lagacy bundle` 的资源，来避免生成重复的资源。但这仍然需要耗费计算资源。因此，`Vite` 添加了此标志，尽可能地避免最初的资源生成。
+
+:::
+
+从以上源码中可以知道，该阶段会借助 `babel` 的能力来解析代吗，解析流程可以查看 `Vite` 注入的 `@babel/preset-env`、`recordAndRemovePolyfillBabelPlugin`, `replaceLegacyEnvBabelPlugin`, `wrapIIFEBabelPlugin` 插件。需要注意的是 `Babel` 会先执行 `@babel/preset-env`，检测并注入模块中所需要的 `Polyfill`。
+
+1. `@babel/preset-env` 插件会根据配置项检测模块中所需的 `Polyfill`，并通过 `import` 的形式按需注入 `core-js` 的子模块。
+
+2. `replaceLegacyEnvBabelPlugin` 插件代码如下：
+
+   ```js
+    function replaceLegacyEnvBabelPlugin() {
+      return ({ types: t }) => ({
+        name: "vite-replace-env-legacy",
+        visitor: {
+          Identifier(path2) {
+            if (path2.node.name === legacyEnvVarMarker) {
+              path2.replaceWith(t.booleanLiteral(true));
+            }
+          }
+        }
+      });
     }
+    ```
+
+  `vite:define` 插件在 `transform` 阶段会将 `import.meta.env.LEGACY` 值替换为 `legacyEnvVarMarker` 的值（ `__VITE_IS_LEGACY__` ），改插件在 `renderChunk` 阶段将 `legacyEnvVarMarker` (`__VITE_IS_LEGACY__`) 替换为具体的值。在 `legacy module` 模块中替换的值为 `true`，在 `normal module` 模块替换的值则为 `false`。不同模块的实现方式有所不同，不同的原因大致可能是因为这里刚好借助 `Babel` 的能力来进行解析，而更加简单直接的实现方式则为文本替换(`normal module` 中的实现方式)。
+
+  ```js
+  // normal module 中的实现方式
+  if (!isLegacyChunk(chunk, opts)) {
+    if (raw.includes(legacyEnvVarMarker)) {
+      const re = new RegExp(legacyEnvVarMarker, 'g')
+      let match
+      while ((match = re.exec(raw))) {
+        ms.overwrite(
+          match.index,
+          match.index + legacyEnvVarMarker.length,
+          `false`,
+        )
+      }
+    }
+  }
+
+  // legacy module 中的实现方式
+  const babel = await loadBabel()
+  const result = babel.transform(raw, {
+    babelrc: false,
+    configFile: false,
+    compact: !!config.build.minify,
+    sourceMaps,
+    inputSourceMap: undefined,
+    presets: [
+      [
+        () => ({
+          plugins: [
+            recordAndRemovePolyfillBabelPlugin(legacyPolyfills),
+            replaceLegacyEnvBabelPlugin(),
+            wrapIIFEBabelPlugin(),
+          ],
+        }),
+      ],
+      [
+        (await import('@babel/preset-env')).default,
+        createBabelPresetEnvOptions(targets, {
+          needPolyfills,
+          ignoreBrowserslistConfig: options.ignoreBrowserslistConfig,
+        }),
+      ],
+    ],
+  })
+  function replaceLegacyEnvBabelPlugin(): BabelPlugin {
+    return ({ types: t }): BabelPlugin => ({
+      name: 'vite-replace-env-legacy',
+      visitor: {
+        Identifier(path) {
+          if (path.node.name === legacyEnvVarMarker) {
+            path.replaceWith(t.booleanLiteral(true))
+          }
+        },
+      },
+    })
+  }
+
+  ```
+
+1. `recordAndRemovePolyfillBabelPlugin` 插件代码如下：
+
+   ```js{8-9}
+    function recordAndRemovePolyfillBabelPlugin(polyfills) {
+      return ({ types: t }) => ({
+        name: "vite-remove-polyfill-import",
+        post({ path: path2 }) {
+          path2.get("body").forEach((p) => {
+            // 判断节点是否为 import 声明
+            if (t.isImportDeclaration(p.node)) {
+              polyfills.add(p.node.source.value);
+              p.remove();
+            }
+          });
+        }
+      });
+    }
+   ```
+
+  `Vite` 在 `renderChunk` 阶段时， `chunk` 的代码已经解析完了 `import` 和 `export`，也就是说这个阶段正常情况下理应各个模块不应该存在 `import` 和 `export`。那么也就是说若再次收集到的 `import` 或 `export` 则必定是 `babel` 在 `@babel/preset-env` 插件中注入的 `polyfill`。明白了这一点那么这个插件所做的工作则为收集所注入的 `polyfill` 信息。
+  `renderChunk` 之后是不会再解析 `import` 申明语法，而直接在此注入 `Polyfill` 代码会存在重复代码问题。`Vite` 决策为抽离项目中各个模块所依赖的 `Polyfill`，作为独立的 `bundle` 在 `index.html` 中加载并执行。因此源码中 `p.remove()` 代码片段就很好理解了。既然 `polyfill` 可以作为独立的 `bundle` 抽离出来，那么其他模块就不需要再特意注入 `polyfill`，当其余模块收集完成后会将注入的 `import` 语句进行删除。
+
+1. `wrapIIFEBabelPlugin` 插件代码如下：
+
+   ```js
+    function wrapIIFEBabelPlugin() {
+      return ({ types: t, template }) => {
+        const buildIIFE = template(";(function(){%%body%%})();");
+        return {
+          name: "vite-wrap-iife",
+          post({ path: path2 }) {
+            if (!this.isWrapped) {
+              this.isWrapped = true;
+              path2.replaceWith(t.program(buildIIFE({ body: path2.node.body })));
+            }
+          }
+        };
+      };
+    }
+   ```
+
+  在源码最外层添加立即执行函数。包裹原因可参考 [PR](https://github.com/vitejs/vite/pull/3783)，主要解决全局作用域污染。
+
+##### 非 legacy 模块的处理
+
+  执行源码如下：
+  
+  ```js
+  // 通过监测支持 import.meta.url 和 动态导入 来判断是否为现代浏览器
+  const detectModernBrowserDetector = 'import.meta.url;import("_").catch(()=>1);async function* g(){};';
+  const modernChunkLegacyGuard = `export function __vite_legacy_guard(){${detectModernBrowserDetector}};`;
+  async renderChunk(raw, chunk, opts) {
+    if (!isLegacyChunk(chunk, opts)) {
+      // options.modernPolyfills = true。不建议设置为 true，因为 core-js@3 非常激进的将 JS 前沿的特性进行注入。甚至目标为对原生 ESM 的支持都需要注入 15kb。
+      if (options.modernPolyfills && !Array.isArray(options.modernPolyfills)) {
+        await detectPolyfills(raw, { esmodules: true }, modernPolyfills);
+      }
+      const ms = new MagicString(raw);
+      // 在入口处注入判断是否为现代浏览器
+      if (genLegacy && chunk.isEntry) {
+        ms.prepend(modernChunkLegacyGuard);
+      }
+      // 确定所注入的 legacyEnvVarMarker 值为 false。正常情况下和后续的 tree-sharking 所关联。
+      if (raw.includes(legacyEnvVarMarker)) {
+        const re = new RegExp(legacyEnvVarMarker, "g");
+        let match;
+        while (match = re.exec(raw)) {
+          ms.overwrite(
+            match.index,
+            match.index + legacyEnvVarMarker.length,
+            `false`
+          );
+        }
+      }
+      if (config.build.sourcemap) {
+        return {
+          code: ms.toString(),
+          map: ms.generateMap({ hires: true })
+        };
+      }
+      return {
+        code: ms.toString()
+      };
+    }
+  }
+  ```
+
+  在支持现代浏览器的 `polyfill` 从上述源码中可以划分以下几个部分：
+
+  1. `options.modernPolyfills` 配置的处理。
+    类似借助 `babel` 的 `@babel/preset-env` 插件来做 **检测(不改变源码)** 并进行收集。
+
+```js
+  if (options.modernPolyfills && !Array.isArray(options.modernPolyfills)) {
+    await detectPolyfills(raw, { esmodules: true }, modernPolyfills);
+  }
+```
+
+  2. 在入口模块处添加检测，用来判断是否为现代浏览器。
+
+```js
+  
+  const detectModernBrowserDetector = 'import.meta.url;import("_").catch(()=>1);async function* g(){};';
+
+  const modernChunkLegacyGuard = `export function __vite_legacy_guard(){${detectModernBrowserDetector}};`;
+
+  const ms = new MagicString(raw);
+  if (genLegacy && chunk.isEntry) {
+    ms.prepend(modernChunkLegacyGuard);
+  }
+```
+
+  3. 确定 `legacyEnvVarMarker` 的值为 `false`。
+
+```js
+if (raw.includes(legacyEnvVarMarker)) {
+  const re = new RegExp(legacyEnvVarMarker, "g");
+  let match;
+  while (match = re.exec(raw)) {
+    ms.overwrite(
+      match.index,
+      match.index + legacyEnvVarMarker.length,
+      `false`
+    );
   }
 }
 ```
 
-注入 `post` babel插件，收集 `babel` 已经注入的 `core-js` polyfill。
+#### transformIndexHtml 钩子的关注点
 
-```js
-function recordAndRemovePolyfillBabelPlugin(polyfills) {
-  return ({ types: t }) => ({
-    name: 'vite-remove-polyfill-import',
-    post({ path }) {
-      path.get('body').forEach((p) => {
-        if (t.isImportDeclaration(p)) {
-          polyfills.add(p.node.source.value)
-          p.remove()
-        }
-      })
-    }
-  })
-}
-```
-
-由于 `Vite` 的 `renderChunk` 阶段 `chunk` 的代码已经解析完了 `import` 和 `export`。因此再次收集到的 `import` 必定是 `babel` 注入的 `polyfill`。
-
-由于需要全局注入 `polyfill`，因此 `polyfill` 可以作为独立的 `bundle` 在 `index.html` 中执行。`polyfill` 作为独立的 `bundle`，因此其他模块就不需要再特意注入 `polyfill`，因此收集完成后会将注入的 `import` 语句进行删除。
-
-```js
-if (t.isImportDeclaration(p)) {
-  polyfills.add(p.node.source.value)
-  p.remove()
-}
-```
 
 收集到的 `polyfill` 集合作为全新的一个模块，其代码如下：
 
@@ -365,6 +597,7 @@ async function buildPolyfillChunk(
   bundle[polyfillChunk.name] = polyfillChunk
 }
 ```
+
 
 ### 实现上的注意点
 
