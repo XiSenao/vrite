@@ -73,17 +73,22 @@
         name: github-pages
         url: ${{ steps.deployment.outputs.page_url }}
         steps:
-        - uses: actions/checkout@v3
-            with:
-            fetch-depth: 0
-        - uses: actions/setup-node@v3
+        - name: Checkout
+            uses: actions/checkout@v3
+        - name: Install pnpm
+            uses: pnpm/action-setup@v2 // [!code ++]
+            with: // [!code ++]
+            version: 7 // [!code ++]
+        - name: Setup node
+            uses: actions/setup-node@v3
             with:
             node-version: 16
-            cache: npm
-        - run: npm ci
+            cache: 'pnpm'
+        - name: Install dependencies
+            run: pnpm install --frozen-lockfile // [!code ++]
         - name: Build
             run: npm run docs:build // [!code --]
-            run: npm run build // [!code ++]
+            run: pnpm build // [!code ++]
         - uses: actions/configure-pages@v2
         - uses: actions/upload-pages-artifact@v1
             with:
@@ -94,7 +99,18 @@
             uses: actions/deploy-pages@v1
     ```
 
-    设置后每次代码 `push` 到 `master` 分支后会自动执行 github 工作流， 工作流会自动执行 `npm run build` 指令来构建当前仓库，将路径为 `.vitepress/dist` 的构建成功的产物进行上传并自动部署到 `github page` 站点上，那么就可以通过 `{username}.github.io` 静态页面。
+    由于 `pnpm` 安装依赖速度快且拥有高效的利用磁盘空间的能力，因此在 `workflows` 中采用 `pnpm` 来做包管理器。 需要注意的是 `GitHub Actions` 运行器镜像中没有预先安装包管理器 `pnpm（不同于 npm 和 yarn）`。因此工作区中需要包含 `pnpm/action-setup` 来安装 `pnpm`。安装依赖使用了 `--frozen-lockfile` 的模式，因此 `workflows` 中所使用的 `pnpm` 版本需要和生成 `pnpm-lock.yaml` 时使用的 `pnpm` 版本一致（在此项目中使用的为 `v7.0`）。还需要注意的是
+
+    ```yaml
+    - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+            version: latest
+    ```
+
+    最新版本的 `pnpm` 对应的是 `pnpm 8.0.0`。
+
+    那么该项目的 `workflows` 就比较清晰了。每次代码 `push` 到 `master` 分支后会自动执行 `github` 工作流，工作流会自动安装 `7.0` 版本的 `pnpm`，确定 `node` 版本（ `v16` ），安装项目依赖后执行 `pnpm build` 指令来构建当前仓库，将路径为 `.vitepress/dist` 的构建成功的产物进行上传并自动部署到 `github page` 站点上，那么就可以通过 `{username}.github.io` 静态页面。
 2. 通过分支来自动部署
 
 ### 自定义域名配置
