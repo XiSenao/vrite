@@ -109,7 +109,7 @@ const legacyConfigPlugin = {
 - `css` 的兼容性版本默认为 `chrome61`。直观的示例是当你要兼容的场景是安卓微信中的 `webview` 时，它支持大多数现代的 `JavaScript` 功能，但并不支持 [CSS 中的 `#RGBA` 十六进制颜色符号](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#rgb_colors)。这种情况下，你需要将 `build.cssTarget` 设置为 `chrome61`(`chrome 61` 以下的版本不支持 `#RGBA`)，来防止 `ESbuild` 将 `rgba()` 颜色默认转化为 `#RGBA` 十六进制符号的形式，[文档参考](https://esbuild.github.io/content-types/#css)（若用户已配置，那么则不做处理）。
 
   以下 `Esbuild` 官方也做出了[解释和建议](https://esbuild.github.io/content-types/#css)：
-  ![Esbuild对于CSS的处理](/esbuild's-handling-of-css.png)
+  ![Esbuild对于CSS的处理](/esbuild-handling-of-css.png)
 
   简单来说，默认情况下 `Esbuild` 的输出将利用所有现代 `CSS` 的特性，因此在使用 `color: rgba()` 和 `CSS 嵌套语法` 的情况下会进行语法的转换和支持。若无法满足运行载体(大多为浏览器)的需求，那么需要为 `Esbuild` 指定特定的构建目标( Vite 中为 **`build.cssTarget`** )。
 
