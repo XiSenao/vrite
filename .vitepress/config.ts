@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitepress'
-import { DefaultTheme } from 'vitepress/types/default-theme'
+import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 
 const headPrependInjectRE = /([ \t]*)<head[^>]*>/i;
 const favicon = `
@@ -20,11 +20,11 @@ export default defineConfig({
   cleanUrls: true,
 
   markdown: {
-    lineNumbers: true,
+    codeTransformers: [transformerTwoslash()],
   },
   
   head: [
-    ['meta', { name: 'theme-color', content: '#3c8772' }],
+    ['meta', { name: 'theme-color', content: '#646cff' }],
     [
       'script',
       {
@@ -37,6 +37,9 @@ export default defineConfig({
   ],
 
   themeConfig: {
+    outline: {
+      level: [2, 3],
+    },
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Guide', link: '/guide/overview', activeMatch: '/guide/' },
@@ -82,7 +85,7 @@ export default defineConfig({
 })
 
 
-function sidebarGuide (): DefaultTheme.SidebarItem[] {
+function sidebarGuide () {
   return [
     {
       text: 'Guide',
@@ -173,11 +176,21 @@ function sidebarGuide (): DefaultTheme.SidebarItem[] {
           link: "/other/deploy-github-page-site"
         }
       ]
+    },
+    {
+      text: "Daily Log",
+      collapsed: false,
+      items: [
+        {
+          text: "2024-08-03",
+          link: "/dailyLog/2024-08-03"
+        }
+      ]
     }
   ]
 }
 
-function sidebarPlugin (): DefaultTheme.SidebarItem[] {
+function sidebarPlugin () {
   return [
     {
       text: "Plugin",
